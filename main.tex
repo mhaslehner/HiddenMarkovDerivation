@@ -1,0 +1,421 @@
+\documentclass{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath}
+
+\title{Hidden Markov Models - A tutorial}
+\author{Mylene Haslehner }
+\date{November 2020}
+
+%\usepackage{biblatex}
+%\addbibresource{hmm.bib}
+
+
+\begin{document}
+
+\maketitle
+\tableofcontents
+\section{Introduction}
+
+The goal of this tutorial is to reformulate and to complete the demonstrations of the three problems of Hidden Markov Models (HMM) in \cite{rab89} by missing steps of a mathematically fully comprehensive demonstration, since to us, important small calculation steps were not mentioned and may hinder many novice readers - like us - of fully understanding the topic. Our intention was to better understand the mathematical basis of this important field of Hidden Markov Models. \newline
+
+Hidden Markov Models describe a stochastic process of an unknown state  $(x_1,...,x_T)$, that is regularly observed. The observations $(z_1,...,z_T)$ are a probabilistic function of the states, each $z_t$ being a function of $x_t$ for $t \in [1,...,T]$. \newline 
+
+HMM have a vast field of applications originating in signal theory, that goes from speech recognition to gene sequencing, over weather or satellite trajectory forecasting. \newline
+
+We consider that $x_t \in [1,...,N]$ if the set of states is finite of size $N \in \mathbf{N}^*$, and that $z_t \in [1,...,M]$ for $M \in \mathbf{N}^*$. 
+The general framing of a HMM is based on initial knowledge of its model parameters, $\lambda := (\pi_i, a_{ij}, b(z_t))$,  
+\begin{equation} 
+\begin{split}
+                \pi_i & := p[x_1 = i] \label{e00}\\
+                 a_{ij} &:= p[x_{t+1} = j|x_t=i] \\
+                 b_i(k) &:= p[z_t=k|x_t=i],
+\end{split}
+\end{equation} for $i, j \in [1,N]$, $k \in [1,M]$, where 
+$\pi $ is the prior (the probability distribution of the first state at time $t=1$), $a_{ij}$ is the transition probability and $b(k)$ is the 'emission probability'. Since we consider a Markov process, $a_{ij}$ is independent of time. \newline
+
+Three characteristic problems have been formulated in the context of HMM by \cite{rab89}, to which we add a fourth problem, that describes prediction in the future. Let us denote by $ p(x) \xrightarrow[x]{}  \text{max}$ the value of $x$ for which $p(x)$ reaches a maximum.
+\begin{itemize}
+\item Problem 1: Calculate $p[z_1,...,z_T|\lambda]$.
+\item Problem 2: $p[{\bf{x}},{\bf{z}}] \xrightarrow[{\bf{x}}]{}  \text{max}$, given $\lambda$.
+\item Problem 3: $p[\lambda] := p[{\bf{z}}|\lambda]  \xrightarrow[\lambda]{}  \text{max}$.
+\item Problem 4: predict $p(x_{T+1}|(z_1,...,z_T),(x_1,...,x_T))$, \newline
+the estimate of the state vector at time $T+1$. 
+\end{itemize}
+
+According to \cite{rab89}, Problem 1 is an 'evaluation problem' that enables to choose the best model among different competing models that best matches the observations: Calculate the probability that the observation sequence was produced by that model.
+Problem 2 finds the 'optimal' state sequence given model parameters and the observation sequence, eg in speech recognition.
+Problem 3 allows to train the model parameters in order to optimally adapt the model to observed training data. This problem allows to create the best model for real phenomena.
+Problem 4 (not derived here) is a prediction problem. It calculates the estimated, most likely, forecast state given the model, and current and past states and observations. Problem 4 is usually solved eg by using Kalman filter and particle filters.
+
+
+\section{Problem 1 (Forward Algorithm)}
+
+The problem consists of calculating the probability of a sequence of observations $z_1,...,z_T$, given the model parameters $\lambda$ as defined above in (\ref{e00}),
+\begin{equation}
+p[z_1,...,z_T|\lambda].
+\end{equation} 
+
+The demonstration starts as follows.
+We have
+\begin{equation}
+\begin{split}
+    p[z_1,...,z_t,x_t] &= p[z_1,...z_{t-1},z_t|x_t]p[x_t] \label{eq1} \\
+    &= p[z_1,...,z_{t-1}|x_t]p[z_t|x_t]p[x_t] \\
+    &= p[z_t|x_t]p[z_1,...,z_{t-1},x_t] \\
+    &= p[z_t|x_t]\sum_{x_{t-1}} p[z_1,...,z_{t-1},x_{t-1},x_t]\\
+    &= p[z_t|x_t]\sum_{x_{t-1}} p[z_1,...,z_{t-1},x_t|x_{t-1}]p[x_{t-1}]\\
+    &= p[z_t|x_t]\sum_{x_{t-1}} p[z_1,...,z_{t-1}|x_{t-1}]p[x_t|x_{t-1}]p[x_{t-1}]\\
+    &= p[z_t|x_t]\sum_{x_{t-1}} p[z_1,...,z_{t-1},x_{t-1}]p[x_t|x_{t-1}], 
+\end{split}
+\end{equation} where we have conditioned on $x_t$ using Bayes theorem and applied the conditional independence of the observations $(z_1,...,z_t)$ in the first two steps, then grouped $z_1,...,z_{t-1}$ and $x_t$ into a joint probability and summed over the variable $x_{t-1}$ in the next two steps. Finally, in the last three steps, we have again conditioned on $x_{t-1}$ using Bayes, applied the conditional independence of $z_1,...,z_{t-1}$ and $x_t$, and grouped $z_1,...,z_{t-1}$ and $x_{t-1}$ into a joint probability. \newline
+
+Let $\alpha_t := p[z_1,...,z_t,x_t]$. For each time step $t$, $\alpha_t$ is a function of $x_{t}$. We have 
+\begin{equation}
+\alpha_t = p[z_t|x_t] \sum_{x_{t-1}} \alpha_{t-1} p[x_t|x_{t-1}].   
+\end{equation} 
+In this way, we can calculate recursively $p[z_1,...,z_t,x_t]$  using previous time steps $t-1$. This is called forward algorithm. \newline
+
+
+Finally, in order to calculate $p[z_1,...,z_t]$, it is sufficient to sum $p[z_1,...,z_t,x_t]$ over $x_t$:
+\begin{equation}
+p[z_1,...,z_t] = \sum_{x_t} \alpha_t,    
+\end{equation} where
+\begin{equation}
+\alpha_t = p[z_t|x_t] \sum_{x_{t-1}} \alpha_{t-1} p[x_t|x_{t-1}]   
+\end{equation} and
+\begin{equation}
+\alpha_1 = p[z_1,x_1].
+\end{equation}
+The probability of the observation sequence can now be calculated recursively.
+
+
+
+\section{Problem 2 (Viterbi)}
+
+This problem consists of maximizing the likelihood of a sequence of states and of observations ${\bf{z}}$ with respect to the states
+\begin{equation}
+p[{\bf{x}},{\bf{z}}]  \xrightarrow[{\bf{x}}]{}  \text{max}.
+\end{equation} 
+
+This problem is equivalent to minimizing the log of the likelihood
+\begin{align}
+- &\log p[{\bf{x}},{\bf{z}}]  \xrightarrow[{\bf{x}}]{}  \text{min} \\
+\Leftrightarrow
+- &\log p[{\bf{z}}|{\bf{x}}]p[{\bf{x}}]  \xrightarrow[{\bf{x}}]{}  \text{min} \\
+\Leftrightarrow
+- &\log p[{\bf{z}}|{\bf{x}}]- \log p[{\bf{x}}]  \xrightarrow[{\bf{x}}]{} \text{min} \\
+\Leftrightarrow
+- &\log \prod_t p[{\bf{z}}_t|{\bf{x}}_t]- \log \prod_t p[{\bf{x}}_{t+1}|{\bf{x}}_{t}]  \xrightarrow[{\bf{x}}_t]{} \text{min} \\
+\Leftrightarrow
+ &  \sum_t \left(-\log p[{\bf{z}}_t|{\bf{x}}_t]- \log  p[{\bf{x}}_{t+1}|{\bf{x}}_{t}] \right) \xrightarrow[{\bf{x}}_t]{} \text{min} \\
+ \Leftrightarrow
+ &  \sum_t \gamma_t \xrightarrow[{\bf{x}}_t]{} \text{min} \\
+  \Leftrightarrow
+ &  \lambda_T \xrightarrow[{\bf{x}}_t]{} \text{min},
+\end{align} where
+
+\begin{align}
+\gamma_t &:= -\log p[{\bf{z}}_t|{\bf{x}}_t]- \log  p[{\bf{x}}_{t+1}|{\bf{x}}_{t}],\\
+\lambda_T &:=\sum_{t=0}^{T-1} \gamma_t.  
+\end{align}
+
+%Since p is a probability, it is a positive number between 0 and 1, whose log is negative and hence, $- \log p[{\bf{x}}|{\bf{z}}]$ can be interpreted as a path (\cite{}). \newline 
+% Define $\lambda_t :=\sum_t \gamma_t  $.\newline
+$\lambda_T$ can be interpreted as a path. The task is to find the shortest path by iteration through a graph. The minimization is done for each time step \cite{forn73}. \newline 
+
+Let $ \tilde{x}_T:= (\tilde{x}_0,...,\tilde{x}_T)$ be the shortest path segment until time T.
+
+Define $\Gamma(x_T) := \lambda_T(\tilde{x}_T)$ as the length $\lambda$ of the shortest path segment $\tilde{x}_T$\newline
+
+
+\begin{itemize}
+\item Initialize:
+For t = 0, $\Gamma({\bf{x}}_0) = 0$ and $\tilde{x}_0 = x_0$.\newline
+
+\item For each t $\textgreater $ 1, find $\Gamma({\bf{x}}_{t+1}):= \min_{{\bf{x}}_{t}} (\Gamma({\bf{x}}_t) + \gamma_{t})) $. \newline
+Store $\Gamma({\bf{x}}_{t+1})$ and $\tilde{x}_{t+1}$
+\end{itemize}
+
+Replace $t+1$ by $t$ and repeat the procedure until $t = T-1$.
+Note that the path segments are M-dimensional vectors, so this procedure needs to be done separately for each of the M coordinates of the path-vector. \newline
+
+In particular, we have
+\begin{align}
+ \Gamma({\bf{x}}_{1}) &= \min_{{\bf{x}}_{0}} (\Gamma({\bf{x}}_0) + \gamma_{1})) \nonumber \\
+ & = \min_{{\bf{x}}_{0}} (-\log p[{\bf{z}}_0|{\bf{x}}_0]- \log  p[{\bf{x}}_{1}|{\bf{x}}_{0}]) \nonumber \\
+ \Gamma({\bf{x}}_{2}) &= \min_{{\bf{x}}_{1}} (\Gamma({\bf{x}}_1) + \gamma_{2})) \nonumber \\
+ & = \min_{{\bf{x}}_{1}} (\Gamma({\bf{x}}_1) -\log p[{\bf{z}}_1|{\bf{x}}_1]- \log  p[{\bf{x}}_{2}|{\bf{x}}_{1}]) \nonumber \\
+  ... & \nonumber\\
+ \Gamma({\bf{x}}_{T}) &= \min_{{\bf{x}}_{T-1}} (\Gamma({\bf{x}}_{T-1}) + \gamma_{T})) \nonumber \\
+ & = \min_{{\bf{x}}_{T-1}} (\Gamma({\bf{x}}_{T-1}) -\log p[{\bf{z}}_{T-1}|{\bf{x}}_{T-1}]- \log  p[{\bf{x}}_{T}|{\bf{x}}_{T-1}]). 
+\end{align}
+
+
+
+
+
+\section{Problem 3 (Baum-Welch)}
+
+The third problem consists of calculating the model parameters that maximize the probability of a sequence of observations:
+
+\begin{equation}
+p[\lambda] := p[z|\lambda]  \xrightarrow[\lambda]{}  \text{max}.
+\end{equation} 
+
+Since it is mathematically unfeasible to find the maximum of this likelihood, we try to look for a $\bar \lambda$ that just does the work of increasing it, i.e. find a $\bar \lambda$ such that
+\begin{equation}
+ p[\bar \lambda] \ge p[\lambda], 
+\end{equation} or, equivalently,
+\begin{equation}
+\begin{split}
+ &\frac{p[\bar \lambda]}{p[\lambda]} \ge 1 \\
+ \Leftrightarrow
+ \log &\left( \frac{p[\bar \lambda]}{p[\lambda]} \right) \ge 0,
+\end{split}
+\end{equation}
+Using the measure-theoretical definition of probabilities, 
+\begin{equation}
+ p[\lambda] = \int_z p(z,\lambda) d\mu(z)
+\end{equation} (where $\mu$ is a non-negative measure and $\mu (z) = 1$) and applying Hoelder inequality to the concave function 
+$\log z $, \cite{baum72} showed that
+\begin{equation}
+\begin{split}
+ \log &\left( \frac{p[\bar \lambda]}{p[\lambda]} \right) \ge 0 \\
+ \Leftrightarrow 
+ \log & \frac{\int_z p[z,\bar \lambda] d\mu(z)}{P[\lambda]} \\
+ = \log & \int_z p[z,\bar \lambda] \frac{d\mu(z) }{P[\lambda]} \\
+ = \log & \int_z \frac{p[z,\bar \lambda]}{p[z,\lambda]} \left[ \frac{p[z,\lambda]d\mu(z) }{P[\lambda]} \right] 
+ \ge 
+  \int_z \log \frac{p[z,\bar \lambda]}{p[z,\lambda]} \left[ \frac{p[z,\lambda]d\mu(z) }{p[\lambda]} \right] \\
+ = & \frac{1}{p[\lambda]}  \int_z \log \left(\frac{p[z,\bar \lambda]}{p[z,\lambda]} \right) p[z,\lambda]d\mu(z) \\
+ = & \frac{1}{P[\lambda]} \left( Q[\lambda, \bar\lambda ] - Q[\lambda,\lambda ] \right) \ge 0,
+\end{split}
+\end{equation}
+where the function
+\begin{equation}
+Q[\lambda, \bar\lambda ] := \int_z p[z,\lambda]\log p[z,\bar \lambda]d\mu(z) 
+\end{equation} is Baum's auxiliary function Q (\cite{baum72}). Note that, if the set of states is discrete, the integrands become sums, $\int_z f(z)d\mu (z) = \sum_z f(z)$.\newline
+
+
+
+This means that increasing the likelihood can be achieved by increasing the auxiliary function for a well-chosen $\bar \lambda$:
+\begin{equation}
+\begin{split}
+\text{If} \quad Q(\lambda,\bar\lambda) \ge Q(\lambda,\lambda) \Rightarrow  
+P[\bar \lambda] \ge P[\lambda].
+\end{split}
+\end{equation}
+
+Such a $\bar \lambda$ can be found by maximizing Q with respect to $\bar \lambda$. 
+
+Recalling expression (\ref{e00}), the model parameters are $\bar \lambda = (\pi_i, a_{ij}, b_{j}(k)) $, where 
+\begin{equation} 
+\begin{split}
+                \pi_i & := p[x_0 = i]\\
+                 a_{ij} &:= p[x_{t+1} = j|x_t = i]\\
+                 b_{j}(k) & := p[z_{t+1}|x_{t+1}=j,x_t=i].
+\end{split}
+\end{equation}
+Let us rewrite Q in discrete form:
+\begin{equation} 
+\begin{split}
+                Q[\lambda, \bar\lambda ] &= \sum_x p[x,\lambda]\log p[x,\bar \lambda] \\
+                &= \sum_{x = (x_0,x_1,...,x_T)} p[x,\lambda] \log \prod_t p[x_t,\bar \lambda_t]\\
+                &= \sum_{x_0=1}^N ... \sum_{x_T=1}^N p[x,\lambda]  \left( \log p[x_0,\bar \lambda] + \sum_{t>0} \log p[x_{t+1}|x_t, \bar\lambda] + \sum_{t>0} \log p[z_{t+1}|x_{t+1},x_t, \bar \lambda] \right)\\
+                &= \sum_{x_0=1}^N ... \sum_{x_T=1}^N p[x,\lambda]  \left( \log \bar \pi_{x_0} + \sum_{t>0} \log \bar a_{ij}(t) + \sum_{t>0} \log \bar b_j(t) \right)
+\end{split}
+\end{equation}
+
+With the constraints 
+\begin{equation} 
+ \sum_{x_0=1}^N \bar \pi_{x_0}  = 1, \quad 
+ \sum_{j = x_{t+1}=1}^N \bar a_{ij}  = 1, \quad
+ \sum_{z_t=1}^N \bar b_j(t)  = 1, \label{e0}
+\end{equation} 
+we maximize the function 
+\begin{equation} 
+\begin{split}
+&L(\bar \pi_{x_0},\bar a_{ij},\bar b_j(t), \mu_1,{\boldsymbol{\mu_2}},{\boldsymbol{\mu_3}}) := Q(\lambda, \bar \pi_{x_0},\bar a_{ij},\bar b_j(t)) \\
+-& \mu_1\left(\sum_{x_0=1}^N \bar \pi_{x_0} - 1\right) -\sum_{i=x_{t}=1}^N\mu_{2i}\left(\sum_{j=x_{t+1}=1}^N \bar a_{ij}  - 1\right) -\sum_{j=x_{t+1}=1}^N\mu_{3j}\left(\sum_{z_t=1}^N \bar b_j(t) - 1\right) \nonumber
+\end{split}
+\end{equation} using Lagrange multipliers. 
+In order to find $\bar \pi_{x_0 = i}$, it is sufficient to calculate the partial derivative, with respect to $\bar \pi_0$ and to $\mu_1$, of
+\begin{equation} 
+\begin{split}
+L(\bar \pi_{x_0},\mu_1) &= \sum_{x=(x_0,...,x_T)} p[x,\lambda] \log \bar \pi_{x_0} - \mu_1\left(\sum_{x_0=1}^N \bar \pi_{x_0} - 1\right) \\
+&= \sum_{x_0}...\sum_{x_T} p[x_0,x_1,...,x_T, \lambda] \log \bar \pi_{x_0} - \mu_1\left(\sum_{x_0=1}^N \bar \pi_{x_0} - 1\right).
+\end{split}
+\end{equation}
+Let $x_0 = i$. We have 
+\begin{align} 
+ &\frac{\partial}{\partial \bar \pi_{x_0=i}} L(\bar \pi_{x_0},\mu_1) = 0 \Leftrightarrow 
+\sum_{x_1}...\sum_{x_T}  p[x_0=i,x_1,...,x_T,\lambda] \frac{1}{\bar \pi_{i}} = \mu_1, \label{e1} \\
+& \frac{\partial}{\partial \mu_1} L(\bar \pi_{x_0},\mu_1) = 0 \Leftrightarrow \sum_{i=1}^N \bar \pi_{i} = 1. \label{e2}
+\end{align}
+
+From equation (\ref{e1}), we find
+\begin{equation}
+\bar \pi_i =  \frac{\sum_{x_1}...\sum_{x_T} \label{e3} p[x_0=i,x_1,...,x_T,\lambda]}{\mu_1}, 
+\end{equation} which we
+substitute into condition (\ref{e2}). 
+We get
+\begin{align}
+\sum_{i=1}^N \bar \pi_{i} &= \sum_{x_0 = i=1}^N \frac{\sum_{x_1} ... \sum_{x_T} p[x_0=i,x_1,...,x_T,\lambda]}{\mu_1} = 1\\
+ \Leftrightarrow \mu_1 &= \sum_{x_0 = i=1}^N \sum_{x_1} ... \sum_{x_T} p[x_0=i,x_1,...,x_T,\lambda] \\
+  \Leftrightarrow \mu_1 &= \sum_x p[x,\lambda].
+\end{align}
+Hence, equation (\ref{e3}) becomes
+\begin{equation}
+\bar \pi_i =  \frac{\sum_{x_1}...\sum_{x_T} \label{e4} p[x_0=i,x_1,...,x_T,\lambda]}{\sum_{x=(x_0,...,x_T)} p[x,\lambda]}. 
+\end{equation}
+
+An analogous calculation for $L(\bar a_{ij},\boldsymbol \mu_2)$ and for $L(\bar b_j(t),\boldsymbol \mu_3)$ leads to the parameters $\bar a_{ij}$ and $\bar b_j(t)$.
+
+
+Let $x_t = i$ and  $x_{t+1} = j$. We have 
+\begin{align} 
+ &\frac{\partial}{\partial \bar a_{i,j}} L(\bar a_{i,j},{\bf{\mu_2}}) = 0 \Leftrightarrow \\
+ &\frac{\partial}{\partial \bar a_{i,j}} \left( \sum_{x = (x_1...,x_T)}  p[x,\lambda] \sum_{t=1}^T \log \bar a_{x_t,x_{t+1}} -\sum_{i=x_{t}=1}^N\boldsymbol \mu_{2i}\left(\sum_{j=x_{t+1}=1}^N \bar a_{ij}  - 1\right) \right) \label{e3} \nonumber \\
+&=
+\frac{\partial}{\partial \bar a_{x_t=i,x_{t+1}=j}} \left( \sum_{x = (x_1...,x_T)}  p[x,\lambda] \left(\log \bar a_{x_1,x_2}+\log \bar a_{x_2,x_3}+...+\log \bar a_{x_{T-1},x_{T}}\right) \right. \\ \nonumber
+&-  \left. \sum_{i=x_{t}=1}^N\boldsymbol \mu_{2i} \left( \sum_{j=x_{t+1}=1}^N \bar a_{ij}  - 1 \right)  \right) \label{e3} \\
+&=  
+\sum_{t=1}^T p[x_1,...,x_t=i,x_{t+1}=j,..x_T,\lambda]  \frac{1}{\bar a_{x_t=i,x_{t+1}=j}} - \mu_{2i} = 0 \label{e4} \\
+&\Leftrightarrow \quad
+ \bar a_{ij} = \sum_{t=1}^T  p[x_1,...,x_t=i,x_{t+1}=j,..x_T,\lambda]  \frac{1}{\mu_{2i}} \label{e_aij}
+\end{align}
+With the condition (\ref{e0}) on $a_{ij}$, we have
+\begin{align}
+    \sum_{j = x_{t+1}=1}^N \sum_{t=1}^T  p[x_1,...,x_t=i,x_{t+1}=j,..x_T,\lambda]  \frac{1}{\mu_{2i}}&=1  \\
+    \Leftrightarrow \quad
+    \sum_{j=1}^N \sum_{t=1}^T p[x_1,...,x_t=i,x_{t+1}=j,..x_T,\lambda]&= \mu_{2i}.
+\end{align}
+Substituting $\mu_{2i}$ into ($\ref{e_aij}$) leads to
+\begin{align}
+    \bar a_{ij} &= \sum_{t=1}^T  p[x_1,...,x_t=i,x_{t+1}=j,..x_T,\lambda]  \frac{1}{\mu_{2i}} \\
+    &= \frac{\sum_{t=1}^T  p[x_1,...,x_t=i,x_{t+1}=j,..x_T,\lambda]}  {\sum_{t=1}^T \sum_{j =1}^N p[x_1,...,x_t=i,x_{t+1}=j,..x_T,\lambda]}.
+\end{align}
+Hence, we have
+\begin{align}
+\bar a_{ij} &= \frac{\sum_{t=1}^T  p[x_t=i,x_{t+1}=j,\lambda]}  {\sum_{t=1}^T \sum_{j =1}^N p[x_t=i,x_{t+1}=j,\lambda]}.
+\end{align}
+
+Finally, we derive $\bar b_j(z_t)$ in a similar way.
+Let $z_{t+1}:= k$ and $x_{t+1}:=j$ (it wouldn't make sense to define an observation earlier ).
+We have 
+\begin{align} 
+ &\frac{\partial}{\partial \bar b_j(k)} L(\bar b_j,{\bf{\mu_3}}) = 0 \Leftrightarrow \\
+ &\frac{\partial}{\partial \bar b_j(k)} \left( \sum_{t>0}\sum_{x = (x_1...,x_T)} \delta_{k,z_{t+1}} p[x,\lambda] \log \bar b_j(k) -\sum_{j=x_{t+1}=1}^N\boldsymbol \mu_{3j}\left(\sum_{k=1}^M \bar b_j(k)  - 1\right) \right) \label{e3} \nonumber \\
+&=
+\sum_{t>0} \delta_{k,z_{t+1}} p[x,\lambda] \frac{1}{\bar b_j(k)} = \mu_{3j}\\
+& \Leftrightarrow \quad
+ \bar b_j(k) = \sum_{t>0} \delta_{k,z_{t+1}} p[x,\lambda] \frac{1}{\mu_{3j}}. 
+\end{align}
+With the condition (\ref{e0}), we have 
+\begin{align}
+\sum_{z_{t+1}=k=1}^M & \bar b_j(k)  = 1 \\
+\Leftrightarrow
+& \sum_{k=1}^M \sum_{t>0} \delta_{k,z_{t+1}} p[x,\lambda] \frac{1}{\mu_{3j}} =1 \\
+\Leftrightarrow \quad
+& \mu_{3j} =  \sum_{t>0} p[x,\lambda]
+\end{align} in virtue of
+\begin{equation}
+    \sum_{k=1}^M \delta_{k,z_{t+1}} = 1.
+\end{equation}
+Finally,
+\begin{align}
+\bar b_j(k) & = \sum_{t>0} \delta_{k,z_{t+1}} p[x,\lambda] \frac{1}{\mu_{3j}} = 
+\sum_{t>0} \delta_{k,z_{t+1}} p[x,\lambda] \frac{1}{\sum_{t>0} p[x,\lambda]}\\
+\Leftrightarrow \quad
+\bar b_j(k) & = \frac{\sum_{t>0| z_{t+1} = k} p[x_{t+1}=j,\lambda]}{\sum_{t>0} p[x_{t+1}=j,\lambda]}.
+\end{align}
+
+To summarize, the parameter $\bar \lambda := (\bar \pi ,\bar a_{ij}, \bar b_j(z_{t+1=k}))$ that maximizes the Q function is given by
+\begin{align}
+\bar \pi_i &=  \frac{\sum_{x_1}...\sum_{x_T} \label{e6} p[x_0 = i ,x_1,...,x_T,\lambda]}{\sum_{x=(x_0,...,x_T)} p[x,\lambda]}
+\\
+\bar a_{ij} &= \frac{\sum_{t=1}^T  p[x_t=i,x_{t+1}=j,\lambda]}  {\sum_{t=1}^T \sum_{j =1}^N p[x_t=i,x_{t+1}=j,\lambda]}
+\\
+ \bar b_j(k) & = \frac{\sum_{t>0| z_{t+1} = k} p[x_{t+1}=j,\lambda]}{\sum_{t>0} p[x_{t+1}=j,\lambda]}.   
+\end{align}
+
+
+
+For the purpose of the derivation of the time-recursive formula for these parameters, let us reformulate the above expressions using Bayes theorem, and by conditioning on ${\bf{z}}$ and $\lambda$ into:
+
+\begin{align}
+\bar \pi_i &=  \frac{\sum_{x=(x_1,...,x_T)} \label{e7} p[x_0=i,x_1,...,x_T|{\bf{z}}, \lambda]}{\sum_{x=(x_0,...,x_T)} p[x|{\bf{z}},\lambda]} \nonumber \\
+&= \sum_{x=(x_1,...,x_T)} \label{} p[x_0=i,x_1,...,x_T|{\bf{z}}, \lambda] \nonumber \\
+&= \sum_{x_1=j}^N \label{} p[x_0=i,x_1=j|{\bf{z}}, \lambda]
+\nonumber \\
+\bar a_{ij} &= \frac{\sum_{t=1}^T  p[x_t=i,x_{t+1}=j|{\bf{z}},\lambda]}  {\sum_{t=1}^T \sum_{j =1}^N p[x_t=i,x_{t+1}=j|{\bf{z}},\lambda]}
+\nonumber \\
+ \bar b_j(k) & = \frac{\sum_{t>0| z_{t+1} = k} p[x_{t+1}=j|{\bf{z}},\lambda]}{\sum_{t>0} p[x_{t+1}=j|{\bf{z}},\lambda]} \nonumber \\
+ & = \frac{\sum_{t>0| z_{t+1} = k} \sum_i p[x_t = i, x_{t+1}=j|{\bf{z}},\lambda]}{\sum_{t>0} \sum_i p[x_t = i, x_{t+1}=j|{\bf{z}},\lambda]}. \label{equ_lamb}
+\end{align}
+ Note that for $\bar \pi_i$, we were able to use the fact that, after conditioning on z and $\lambda$, the denominator sums up to one, since in general $\sum_x p(x,y) = p(y)$ for any x and y.\newline
+
+
+Let us show that the model parameters $\bar \pi_i$, $\bar a_{ij}$, $\bar b_j$ can be calculated inductively. Note that all parameters depend on the quantity $p[x_t = i, x_{t+1}=j|{\bf{z}},\lambda]$, which will be reformulated below. For the sake of ease, let us for now omit to write the indices i and j, as well as $\lambda$, and make transformations on $p[x_t, x_{t+1}|{\bf{z}}].$\newline
+
+
+Let us split the observation sequence into three components, $(z_1,...,z_t)$, $z_{t+1}$, $(z_{t+2},...,z_T)$.
+${\bf{z_1}}:= (z_1,...,z_t)$, ${\bf{z_2}}:= (z_{t+2},...,z_T)$.
+
+
+We have 
+\begin{equation}
+\begin{split}
+p[x_t, x_{t+1}|{\bf{z}}] &= \frac{p[x_t,x_{t+1},{\bf{z}}]}{p[\bf{z}]} \\
+&= \frac{p[{\bf{z}}|x_t, x_{t+1}]p[x_t, x_{t+1}]}{p[\bf{z}]} \\
+&= \frac{p[{\bf{z}_1},z_{t+1},{\bf{z}_2}|x_t, x_{t+1}]p[x_t, x_{t+1}]}{p[\bf{z}]} \\
+&= \frac{p[{\bf{z}_1}|x_t, x_{t+1}]p[z_{t+1}|x_t, x_{t+1}]p[{\bf{z}_2}|x_t, x_{t+1}]p[x_t, x_{t+1}]}{p[\bf{z}]} \\
+&= \frac{p[{\bf{z}_1}|x_t]p[z_{t+1}|x_{t+1}]p[{\bf{z}_2}| x_{t+1}]P[x_t, x_{t+1}]}{p[\bf{z}]}\\
+&= \frac{p[{\bf{z}_1}|x_t]p[x_t]p[z_{t+1}|x_{t+1}]p[{\bf{z}_2}| x_{t+1}]p[x_{t+1}|x_t]}{p[\bf{z}]} \\
+&= \frac{p[{\bf{z}_1},x_t]p[z_{t+1}|x_{t+1}]p[{\bf{z}_2}| x_{t+1}]p[x_{t+1}|x_t]}{p[\bf{z}]}
+\end{split}
+\end{equation}
+Reintroducing the indices in the notation for $a_{ij}$ and $b_j(k)$ as in (\ref{e00}), and defining $\alpha_t$ and $\beta_{t+1}$ as follows,
+\begin{align}
+a_{ij} &:= p[x_{t+1}=j|x_{t}=i] \\
+b_{j}&(k):= p[z_{t+1}=k|x_{t+1}=j]\\
+\alpha_t &:= p[{\bf{z}_1},x_t] \\
+\beta_{t+1}(j)&:=p[{\bf{z}_2}| x_{t+1}=j] 
+\end{align}
+
+Hence,
+\begin{equation}
+\begin{split}
+p[x_t = i, x_{t+1} = j |{\bf{z}}] 
+= \frac{p[x_t,x_{t+1},{\bf{z}}]}{p[\bf{z}]} \\
+= \frac{p[x_t = i,x_{t+1} = j,{\bf{z}}]}{\sum_i \sum_j p[x_t = i, x_{t+1} = j |{\bf{z}}]} \\
+= \frac{\alpha_{t} a_{ij} b_j(k)\beta_{t+1}(j)  }{\sum_i \sum_j \alpha_{t} a_{ij} b_j(k)\beta_{t+1}(j) }.
+\end{split}
+\end{equation}
+Finally, if we set 
+\begin{equation}
+\xi_t(i,j):= \frac{\alpha_{t} a_{ij} b_j(k)\beta_{t+1}(j)  }{\sum_i \sum_j \alpha_{t} a_{ij} b_j(k)\beta_{t+1}(j) },    
+\end{equation} the model parameters are
+%%%%%
+\begin{align}
+\bar \pi_i &=  \sum_{j=1}^N \label{} p[x_0=i,x_1=j|{\bf{z}}, \lambda] = \sum_j \xi_0, (i,j),
+ \nonumber \\
+\bar a_{ij} &= \frac{\sum_{t=1}^T \xi_t(i,j)}  {\sum_{t=1}^T \sum_{j} \xi_t(i,j)},
+\nonumber \\
+ \bar b_j(k) & = \frac{\sum_{t>0| z_{t+1} = k} \sum_i \xi_t(i,j)}{\sum_{t>0} \sum_i \xi_t(i,j)}. \label{}
+\end{align}
+
+
+%\printbibliography
+
+
+\begin{thebibliography}{99}
+\bibitem[Baum(1972)]{baum72} Baum L. E., An Inequality and Associated Maximization Technique in Statistical Estimation for Probabilistic Functions of Markov Processes (Inequalities, 1972)
+\bibitem[Bishop(2006)]{bish00} Bishop C. M., Pattern Recognition and Machine Learning (Springer 2006)
+\bibitem[Forney(1973)]{forn73} Forney G. D., The Viterbi Algorithm (IEEE, 1973)
+\bibitem[Rabiner(1989)]{rab89} Rabiner L. R., A tutorial on Hidden Markov Models and Selected Applications in Speech Recognition (IEEE, 1989)
+\end{thebibliography}
+
+
+\end{document}
